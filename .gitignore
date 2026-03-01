@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Python/cache leftovers
+__pycache__/
+*.pyc
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment files
+.env
+.env.*

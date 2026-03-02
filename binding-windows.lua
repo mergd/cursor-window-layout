@@ -81,7 +81,7 @@ local function default_config()
     layouts = {
       quadrants = {
         description = "Default quadrants layout (configure rules via CLI)",
-        screen = "primary",
+        screen = "focused",
         rules = {},
       },
     },
@@ -107,7 +107,22 @@ local function readConfig()
 end
 
 local function targetScreen(layout)
-  if not layout or not layout.screen or layout.screen == "primary" then
+  if not layout or not layout.screen or layout.screen == "focused" then
+    local mouseScreen = hs.mouse.getCurrentScreen()
+    if mouseScreen then
+      return mouseScreen
+    end
+    local focusedWindow = hs.window.focusedWindow()
+    if focusedWindow then
+      local focusedScreen = focusedWindow:screen()
+      if focusedScreen then
+        return focusedScreen
+      end
+    end
+    return hs.screen.primaryScreen()
+  end
+
+  if layout.screen == "primary" then
     return hs.screen.primaryScreen()
   end
 
@@ -118,6 +133,13 @@ local function targetScreen(layout)
   end
 
   return hs.screen.primaryScreen()
+end
+
+local function screenName(screen)
+  if not screen then
+    return "nil"
+  end
+  return screen:name() or "unknown"
 end
 
 local function frameForPosition(screenFrame, position)
@@ -207,8 +229,49 @@ local function applyLayout(name)
 
   hs.notify.new({
     title = "Binding Windows",
-    informativeText = string.format("Applied '%s' (%d window%s)", layoutName, moved, moved == 1 and "" or "s")
+    informativeText = string.format(
+      "Applied '%s' on %s (%d window%s)",
+      layoutName,
+      screenName(screen),
+      moved,
+      moved == 1 and "" or "s"
+    )
   }):send()
+end
+
+local function debugTarget(layoutName)
+  local config = readConfig()
+  if not config then
+    return
+  end
+
+  local chosenLayout = layoutName or config.active_layout or config.default_layout
+  local layout = (config.layouts or {})[chosenLayout]
+  if not layout then
+    hs.notify.new({
+      title = "Binding Windows Debug",
+      informativeText = "Layout not found: " .. tostring(chosenLayout)
+    }):send()
+    return
+  end
+
+  local mouseScreen = hs.mouse.getCurrentScreen()
+  local focusedWindow = hs.window.focusedWindow()
+  local focusedScreen = nil
+  if focusedWindow then
+    focusedScreen = focusedWindow:screen()
+  end
+  local chosenScreen = targetScreen(layout)
+
+  local msg = string.format(
+    "layout=%s screenMode=%s chosen=%s mouse=%s focused=%s",
+    tostring(chosenLayout),
+    tostring(layout.screen or "focused"),
+    screenName(chosenScreen),
+    screenName(mouseScreen),
+    screenName(focusedScreen)
+  )
+  hs.notify.new({ title = "Binding Windows Debug", informativeText = msg }):send()
 end
 
 local function clearHotkeys()
@@ -270,6 +333,14 @@ hs.urlevent.bind("binding-windows-reload", function()
   bindHotkeys()
   setupScreenWatcher()
   hs.notify.new({ title = "Binding Windows", informativeText = "Reloaded binding-windows config" }):send()
+end)
+
+hs.urlevent.bind("binding-windows-debug-target", function(_, params)
+  local name = nil
+  if params then
+    name = params.name
+  end
+  debugTarget(name)
 end)
 
 layoutCursorWindows = applyLayout
@@ -503,6 +574,7 @@ Usage:
   binding-windows import <path>
   binding-windows delay <seconds>
   binding-windows auto-apply <true|false>
+  binding-windows debug-target [layout]
   binding-windows apply [name]
 
 Hotkeys are fixed to ctrl+alt(option)+cmd+<number>.
@@ -927,7 +999,7 @@ local function cmd_create(args)
   else
     layouts[name] = {
       description = "New 4-quadrant layout",
-      screen = "primary",
+      screen = "focused",
       rules = {
         { title = name, position = "top_left", match = "exact" },
         { title = name .. "-1", position = "top_right", match = "exact" },
@@ -1283,6 +1355,16 @@ local function cmd_apply(args)
   print("Requested apply for layout: " .. name)
 end
 
+local function cmd_debug_target(args)
+  local name = args[1]
+  ping_hammerspoon("binding-windows-debug-target", { name = name or "" })
+  if name and name ~= "" then
+    print("Requested debug target for layout: " .. name)
+  else
+    print("Requested debug target for active/default layout")
+  end
+end
+
 local function cmd_export(args)
   local target_path = args[1]
   if not target_path then
@@ -1374,6 +1456,8 @@ local function main()
     cmd_delay(args)
   elseif command == "auto-apply" then
     cmd_auto_apply(args)
+  elseif command == "debug-target" then
+    cmd_debug_target(args)
   elseif command == "apply" then
     cmd_apply(args)
   else

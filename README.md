@@ -31,6 +31,7 @@ Bootstrap creates:
 ```bash
 # health / listing
 ./binding-windows doctor
+./binding-windows debug-target two-up
 ./binding-windows list
 ./binding-windows list --json
 
@@ -56,4 +57,5 @@ Bootstrap creates:
 
 - Hotkeys are fixed to `ctrl + option(alt) + cmd + <1-9>`.
 - Layout defaults are generic; no hardcoded title rules.
+- Screen targeting defaults to the focused/clicked window's display (`screen = "focused"`).
 - This is Lua-only; no long-running CLI process.

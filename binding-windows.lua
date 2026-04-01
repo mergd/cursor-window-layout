@@ -212,6 +212,7 @@ local function applyLayout(name)
 
   local windows = cursorApp:allWindows()
   local moved = 0
+  local matchedWindows = {}
 
   for _, rule in ipairs(layout.rules or {}) do
     local targetFrame = frameForPosition(frame, rule.position)
@@ -220,10 +221,18 @@ local function applyLayout(name)
         local title = win:title()
         if titleMatches(title, rule) then
           win:setFrame(targetFrame)
+          table.insert(matchedWindows, win)
           moved = moved + 1
           break
         end
       end
+    end
+  end
+
+  if moved > 0 then
+    cursorApp:activate()
+    for _, win in ipairs(matchedWindows) do
+      win:raise()
     end
   end
 
